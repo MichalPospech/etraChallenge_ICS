@@ -1,8 +1,10 @@
 ---
 title: "Analysis"
-author: "Your name"
-date: '`r format(Sys.time(), "%d %B, %Y")`'
-output: html_document
+author: "Michal Pospěch"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ## Load libraries
@@ -12,7 +14,7 @@ if(!require(tidyverse)){install.packages("tidyverse"); library(tidyverse)} # bun
 if(!require(here)){install.packages("here"); library(here)} # package for handling paths in the project
 if(!require(ez)){install.packages("ez"); library(ez)} # package for running ANOVAs
 if(!require(saccades)){install.packages("saccades"); library(saccades)} # package for detecting fixations
-
+if(!require(zoo)){install.packages("zoo"); library(zoo)}
 if(!"devtools" %in% rownames(installed.packages())) install.packages("devtools")
 # Install the stable development verions from GitHub
 devtools::install_github("crsh/papaja")
@@ -31,7 +33,11 @@ if(!dir.exists(data_pth)) {
   dir.create(data_pth)
 }
 # uncomment following file for downloading data
-# download.file("http://smc.neuralcorrelate.com/ETRA2019/ETRA2019Challenge.zip",here(data_pth,"ETRA2019Challenge.zip"))
+if(!file.exists(here(data_pth,"ETRA2019Challenge.zip"))){
+  options(timeout=300)
+  download.file("http://smc.neuralcorrelate.com/ETRA2019/ETRA2019Challenge.zip",here(data_pth,"ETRA2019Challenge.zip"))
+  unzip(here(data_pth,"ETRA2019Challenge.zip"), exdir = data_pth)
+}
 ```
 
 Than unzip data and move them to the folder. The directory *data* should therefore contain following directories/files
@@ -46,19 +52,51 @@ You can use *readr* package, which is supplied within *tidyverse* package bundle
 
 ```{r load data, warning=F, message = F}
 
+local_data_pth <- here(data_pth, "data")
+files <- dir(local_data_pth, pattern = ".*FreeViewing_Puzzle_.*.csv", recursive = TRUE) # get file names
 
-local_data_pth <- here(data_pth, "data", "009")
-files <- dir(local_data_pth, pattern = ".*Fixation_Puzzle_.*.csv") # get file names
+interpolate_nas <- function(data){
+      print(data)
+      data$LXpix = na.approx(data$LXpix,x=data$Time, na.rm = FALSE)
+      data$LYpix = na.approx(data$LYpix,x=data$Time, na.rm = FALSE)
+      data$RXpix = na.approx(data$RXpix,x=data$Time, na.rm = FALSE)
+      data$RYpix = na.approx(data$RYpix,x=data$Time, na.rm = FALSE)
+      data$LP = na.approx(data$LP,x=data$Time, na.rm = FALSE)
+      data$RP = na.approx(data$RP,x=data$Time, na.rm = FALSE)
+      return(data)
+}
 
-df_fix_puzzle <- files %>%
-  map(read_data) %>% 
+
+df_free_puzzle <- files %>%
+  map(read_data) %>%
+  map(select(-ends_with("href"))) %>%
+  map(interpolate_nas) %>%
   reduce(rbind) %>% as_tibble()
 
-local_data_pth <- here(data_pth, "data", "009")
-files <- dir(local_data_pth, pattern = ".*Fixation_Waldo_.*.csv") # get file names
+local_data_pth <- here(data_pth, "data")
+files <- dir(local_data_pth, pattern = ".*FreeViewing_Waldo_.*.csv", recursive = TRUE) # get file names
 
-df_fix_waldo <- files %>%
+df_free_waldo <- files %>%
   map(read_data) %>% 
+    interpolate_nas() %>%
+
+  reduce(rbind) %>% as_tibble()
+
+local_data_pth <- here(data_pth, "data")
+files <- dir(local_data_pth, pattern = ".*FreeViewing_Natural_.*.csv", recursive = TRUE) # get file names
+
+df_free_natur <- files %>%
+  map(read_data) %>% 
+    interpolate_nas() %>%
+
+  reduce(rbind) %>% as_tibble()
+
+local_data_pth <- here(data_pth, "data")
+files <- dir(local_data_pth, pattern = ".*FreeViewing_Blank_.*.csv", recursive = TRUE) # get file names
+
+df_free_blank <- files %>%
+  map(read_data) %>%   
+  interpolate_nas() %>%
   reduce(rbind) %>% as_tibble()
 
 ```
